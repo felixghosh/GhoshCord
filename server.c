@@ -1,11 +1,13 @@
 #include "common.h"
 #include <strings.h>
+#include <pthread.h>
+
+void* handle_connection(void* connfd);
 
 int main(int argc, char **argv){
-    int listenfd, connfd, n;
+    int listenfd, connfd;
     struct sockaddr_in servaddr;
-    uint8_t buff[MAXLINE+1];        //sen buffer
-    uint8_t recvline[MAXLINE+1];    //receive buffer
+    
     
     if((listenfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) //init socket
         err_n_die("socket error.");
@@ -23,34 +25,64 @@ int main(int argc, char **argv){
 
     int finished = 0;
     while(!finished){
-        struct sockaddr_in addr;
+        struct sockaddr_in client_addr;
         socklen_t addr_len;
 
         printf("wating for a connection on port %d\n", SERVER_PORT);
         fflush(stdout);
         //this will block until a connetion is established
-        connfd = accept(listenfd, (SA *) NULL, NULL);
+        connfd = accept(listenfd, (SA *) &client_addr, &addr_len);
 
-        memset(recvline, 0, MAXLINE);       //zero the buffer to make sure the string we receive is null terminated
+        char str[40];
+        inet_ntop(AF_INET, &client_addr.sin_addr, str, sizeof(str));
+        printf("Client connected! Address: %s\n", str);
 
-        while((n = read(connfd, recvline, MAXLINE-1)) > 0){
-            fprintf(stdout, "\n%s\n\n%s", bin2hex(recvline, n), recvline);
-
-            if(recvline[n-1] == '\n')   //check for end of message
-                break;
-            memset(recvline, 0, MAXLINE);
-        }
-
-        if(n < 0)
-            err_n_die("read error.");
-
-        //put response in buffer
-        snprintf((char*)buff, sizeof(buff), "HTTP/1.0 200 OK\r\n\r\nHello");
-        //write the response using the connection socket and then close it
-        write(connfd, (char*)buff, strlen((char*)buff));
-        close(connfd);
+        int *pclient = malloc(sizeof(int));
+        *pclient = connfd;
+        pthread_t t;
+        pthread_create(&t, NULL, handle_connection, pclient);
     }
-
-
     return 0;
 }
+
+void* handle_connection(void* p_connfd){
+    int connfd = *((int*)p_connfd);
+    free(p_connfd);
+    char sendbuff[MAXLINE+1];        //send buffer
+    char recvbuff[MAXLINE+1];    //receive buffer
+    int n;
+    memset(recvbuff, 0, MAXLINE);       //zero the buffer to make sure the string we receive is null terminated
+
+    while((n = read(connfd, recvbuff, MAXLINE-1)) > 0){
+        fprintf(stdout, "\n%s\n\n%s", bin2hex(recvbuff, n), recvbuff);
+
+        if(recvbuff[n-1] == '\n')   //check for end of message
+            break;
+        memset(recvbuff, 0, MAXLINE);
+    }
+
+    if(n < 0)
+        err_n_die("read error.");
+
+    //put response in buffer
+    snprintf(sendbuff, sizeof(sendbuff), "Hello, I am a server!\n");
+    //write the response using the connection socket and then close it
+    write(connfd, sendbuff, strlen(sendbuff));
+
+    int finished = 0;
+    while(!finished){
+        memset(recvbuff, 0, MAXLINE);
+        while((n = read(connfd, recvbuff, MAXLINE-1)) > 0){
+            fprintf(stdout, "\n%s", recvbuff);
+
+            if(recvbuff[n-1] == '\n')   //check for end of message
+                break;
+            memset(recvbuff, 0, MAXLINE);
+        }
+        if(n < 0)
+            err_n_die("read error.");
+    }
+    close(connfd);
+    return NULL;
+}
+
