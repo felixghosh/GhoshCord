@@ -1,6 +1,6 @@
 sc: server.c client.c common.o
-	gcc -g server.c -o server common.o -pthread
-	gcc -g client.c -o client common.o
+	cc -g server.c -o server common.o -pthread
+	cc -g client.c -o client common.o -pthread
 
 common.o: common.c
-	gcc -g common.c -o common.o
+	cc -c common.c -o common.o

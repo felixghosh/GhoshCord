@@ -1,5 +1,8 @@
 #include "common.h"
 #include <strings.h>
+#include <pthread.h>
+
+void* listen_to_server(void* p_sockfd);
 
 int main(int argc, char **argv){
     int sockfd, n, sendbytes;
@@ -7,8 +10,9 @@ int main(int argc, char **argv){
     char sendbuff[MAXLINE];
     char recvbuff[MAXLINE];
 
-    if (argc != 2)
-        err_n_die("usage: %s <server address>", argv[0]);
+    if (argc != 3)
+        err_n_die("usage: %s <server address> <username>", argv[0]);
+    char* username = argv[2];
 
     if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
         err_n_die("socket error.");
@@ -23,15 +27,15 @@ int main(int argc, char **argv){
     if(connect(sockfd, (SA *) &servaddr, sizeof(servaddr)) < 0)
         err_n_die("connect error.");
     
-    sprintf(sendbuff, "Hello! I am a client!\n");
+    sprintf(sendbuff, "%s\n", username);    
     sendbytes = strlen(sendbuff);
 
-    if(write(sockfd, sendbuff, sendbytes) != sendbytes)
+    if(write(sockfd, sendbuff, sendbytes) != sendbytes) //send username to server
         err_n_die("write error.");
 
     memset(recvbuff, 0, MAXLINE);
 
-    while((n = read(sockfd, recvbuff, MAXLINE-1)) > 0){
+    while((n = read(sockfd, recvbuff, MAXLINE-1)) > 0){ //read wlcome message
         printf("%s", recvbuff);
         if(recvbuff[n-1] == '\n')   //check for end of message
                 break;
@@ -39,8 +43,15 @@ int main(int argc, char **argv){
 
     }
 
+    memset(recvbuff, 0, MAXLINE);
+
     if(n < 0)
         err_n_die("read error.");
+
+    int *p_sockfd = malloc(sizeof(int));
+    *p_sockfd = sockfd;
+    pthread_t t;
+    pthread_create(&t, NULL, listen_to_server, p_sockfd);
 
     int finished = 0;
     while(!finished){
@@ -56,4 +67,26 @@ int main(int argc, char **argv){
     
 
     return 0;
+}
+
+void* listen_to_server(void* p_sockfd){
+    int sockfd = *((int*)p_sockfd);
+    free(p_sockfd);
+    char recvbuff[MAXLINE];
+    int n;
+    memset(recvbuff, 0, MAXLINE); 
+
+    int finished = 0;
+    while(!finished){
+        memset(recvbuff, 0, MAXLINE);
+        while((n = read(sockfd, recvbuff, MAXLINE-1)) > 0){
+            printf("%s", recvbuff);
+            if(recvbuff[n-1] == '\n')
+                break;
+            memset(recvbuff, 0, MAXLINE);
+        }
+        if(n < 0)
+                err_n_die("read error.");
+    }
+    pthread_exit(NULL);
 }
