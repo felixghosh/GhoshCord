@@ -3,8 +3,11 @@
 #include <pthread.h>
 
 typedef struct connection_t connection_t;
+typedef struct sockets_t sockets_t;
 
 void* handle_connection(void* connfd);
+
+void* accept_connections(void* sockets);
 
 void broadcast_message(char* message, char* username);
 
@@ -12,6 +15,18 @@ struct connection_t{
     int connfd;
     char* username;
 };
+
+struct sockets_t{
+    int connfd;
+    int listenfd;
+};
+
+sockets_t* new_sockets(int connfd, int listenfd){
+    sockets_t* sockets = malloc(sizeof(sockets_t));
+    sockets->connfd = connfd;
+    sockets->listenfd = listenfd;
+    return sockets;
+}
 
 connection_t* new_connection(int connfd, char* username){
     connection_t* connection = malloc(sizeof(connection_t));
@@ -42,6 +57,31 @@ int main(int argc, char **argv){
     if((listen(listenfd, 10)) < 0)
         err_n_die("listen error.");
 
+    sockets_t *p_sockets = new_sockets(connfd, listenfd);
+    pthread_t ac;
+    pthread_create(&ac, NULL, accept_connections, p_sockets);
+    
+
+    int finished = 0;
+    char query[20];
+    while(!finished){
+        memset(query, 0, 20);
+        scanf("%19s", query);
+        if(strcmp(query, "quit") == 0){
+            printf("\nServer shutting down!\n");
+            broadcast_message("\n#####################\nSERVER SHUTTING DOWN!\n#####################\n", "");
+            finished = 1;
+            break;
+        }
+    }
+    return 0;
+}
+
+void* accept_connections(void* p_sockets){
+    int connfd = ((sockets_t*)p_sockets)->connfd;
+    int listenfd = ((sockets_t*)p_sockets)->listenfd;
+    free(p_sockets);
+
     int finished = 0;
     while(!finished){
         struct sockaddr_in client_addr;
@@ -61,7 +101,6 @@ int main(int argc, char **argv){
         pthread_t t;
         pthread_create(&t, NULL, handle_connection, pclient);
     }
-    return 0;
 }
 
 void* handle_connection(void* p_connfd){
@@ -112,7 +151,7 @@ void* handle_connection(void* p_connfd){
         if(n < 0)
             err_n_die("read error.");
 
-        if(n == 0){
+        if(n == 0){                     //Detect user disconnecting
             snprintf(sendbuff, sizeof(sendbuff), "%s has left the server!\n", username);
             broadcast_message(sendbuff, username);
             break;
@@ -128,7 +167,6 @@ void* handle_connection(void* p_connfd){
 }
 
 void broadcast_message(char* message, char* username){
-    
     for(int i = 0; i < nbr_connections; i++){
         if(strcmp(connections[i]->username, username) != 0){
             write(connections[i]->connfd, message, strlen(message));
