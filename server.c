@@ -125,6 +125,11 @@ void* handle_connection(void* p_connfd){
 
     recvbuff[n-1] = '\0';           //remove newline from username
     strcpy(username, recvbuff);
+    if(strcmp(username, "") == 0){
+        printf("Username NULL is not allowed! Killing connection!\n");
+        close(connfd);
+        pthread_exit(NULL);
+    }
     printf("Client connected! Username: %s\n", username);
     
     connections[nbr_connections] = new_connection(connfd, username);    //add connection to list
@@ -154,6 +159,14 @@ void* handle_connection(void* p_connfd){
         if(n == 0){                     //Detect user disconnecting
             snprintf(sendbuff, sizeof(sendbuff), "%s has left the server!\n", username);
             broadcast_message(sendbuff, username);
+            int i;
+            for(i = 0; i < nbr_connections; i++){
+                if(strcmp(connections[i]->username, username) == 0)
+                    break;
+            }
+            for(int j = i; j < nbr_connections-1; j++)
+                connections[j] = connections[j+1];
+            nbr_connections--;
             break;
         }
         char message[MAXLINE+3+strlen(username)];
