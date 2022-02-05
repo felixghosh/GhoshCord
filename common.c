@@ -1,4 +1,5 @@
 #include "common.h"
+#include <ncurses.h>
 
 void err_n_die(const char *fmt, ...){
     int errno_save;
