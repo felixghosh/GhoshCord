@@ -3,6 +3,11 @@
 #include <string.h>
 #include <locale.h>
 
+/*
+THIS PROGRAM IS NOT ACUTALLY RUN
+IT IS ONLY A TEST PROGRAM FOR USING NCURSES
+*/
+
 
 int main(){
     setlocale(LC_CTYPE, "");
