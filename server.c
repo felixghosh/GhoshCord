@@ -40,7 +40,9 @@ connection_t* new_connection(int connfd, char* username){
 
 //Global variables
 connection_t* connections[100];                             //Array of connections
+pthread_t threads[100];                                     //Array of threads
 int nbr_connections = 0;                                    //Number of connected users
+int nbr_threads = 0;
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;   //Lock for accessing shared data
 
 
@@ -86,11 +88,24 @@ int main(int argc, char **argv){
             finished = 1;
         }
     }
+
+    //join threads here???
+    pthread_cancel(ac);
+    pthread_join(ac, NULL);
+    for(int i = 0; i < nbr_connections; i++){
+        free(connections[i]);
+        pthread_cancel(threads[i]);
+        pthread_join(threads[i], NULL);
+    }
+    for(int i = 0; i < nbr_threads; i++)
+        pthread_join(threads[i], NULL);
+    printf("done!\n");
     return 0;   //Successful termination
 }
 
 //This function runs in a separate thread from main and listens for any new connecting clients
 void* accept_connections(void* p_sockets){
+    pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
     //Grab parameters from param-struct and free the pointer
     int connfd = ((sockets_t*)p_sockets)->connfd;
     int listenfd = ((sockets_t*)p_sockets)->listenfd;
@@ -123,12 +138,16 @@ void* accept_connections(void* p_sockets){
         *pclient = connfd;
         pthread_t t;
         pthread_create(&t, NULL, handle_connection, pclient);
+        pthread_mutex_lock(&mutex);
+        threads[nbr_connections] = t;
+        pthread_mutex_unlock(&mutex);
     }
 }
 
 //This functions is run by several threads, one for each connection.
 //It listens to the client for messages and broadcasts them to the other connected clients.
 void* handle_connection(void* p_connfd){
+    pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
     //Grab the parameter and free the pointer
     int connfd = *((int*)p_connfd);
     free(p_connfd);
@@ -165,8 +184,9 @@ void* handle_connection(void* p_connfd){
     
     //Add connection to list
     pthread_mutex_lock(&mutex);
-    connections[nbr_connections] = new_connection(connfd, username);    
+    connections[nbr_connections] = new_connection(connfd, username);
     nbr_connections++;
+    nbr_threads++;
     pthread_mutex_unlock(&mutex);
 
     //Broadcast that user has joined
@@ -204,17 +224,19 @@ void* handle_connection(void* p_connfd){
             int i;
             //Find index of user
             pthread_mutex_lock(&mutex);
+            printf("%s\n", sendbuff);
             for(i = 0; i < nbr_connections; i++){
                 if(strcmp(connections[i]->username, username) == 0)
                     break;
             }
-            //Free the pointer, remove user from list of connections, and shift the array to fill the hole
+            //Free the pointer, remove user from list of connections, and shift the array to fill the hole, and exit thread
             free(connections[i]);
-            for(int j = i; j < nbr_connections-1; j++)
+            for(int j = i; j < nbr_connections-1; j++){
                 connections[j] = connections[j+1];
+            }
             nbr_connections--;
             pthread_mutex_unlock(&mutex);
-            break;
+            finished = 1;
         }
         //Prepend username to message string and broadcast to users
         char message[MAXLINE+3+strlen(username)];
@@ -224,6 +246,7 @@ void* handle_connection(void* p_connfd){
         broadcast_message(message, username);
     }
     close(connfd);
+    printf("thread exiting");
     pthread_exit(NULL);
 }
 

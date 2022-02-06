@@ -2,3 +2,4 @@ server
 client
 window
 *.o
+vgcore.*
