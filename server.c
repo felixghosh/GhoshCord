@@ -39,8 +39,9 @@ connection_t* new_connection(int connfd, char* username){
 }
 
 //Global variables
-connection_t* connections[100]; //Array of connections
-int nbr_connections = 0;         //Number of connected users
+connection_t* connections[100];                             //Array of connections
+int nbr_connections = 0;                                    //Number of connected users
+static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;   //Lock for accessing shared data
 
 
 int main(int argc, char **argv){
@@ -78,7 +79,9 @@ int main(int argc, char **argv){
         memset(query, 0, 20);                       //Zero out query
         scanf("%19s", query);                       //Read user input
         if(strcmp(query, "quit") == 0){             //Only command as of now is shutting down the server
+            pthread_mutex_lock(&mutex);
             printf("\nServer shutting down!\n");
+            pthread_mutex_unlock(&mutex);
             broadcast_message("\n#####################\nSERVER SHUTTING DOWN!\n#####################\n", "");
             finished = 1;
         }
@@ -100,8 +103,10 @@ void* accept_connections(void* p_sockets){
         struct sockaddr_in client_addr;
         socklen_t addr_len;
 
+        pthread_mutex_lock(&mutex);
         printf("wating for next connection on port %d\n\n", SERVER_PORT);
         fflush(stdout);
+        pthread_mutex_unlock(&mutex);
 
         //This will block until a connetion is established
         connfd = accept(listenfd, (SA *) &client_addr, &addr_len);
@@ -109,7 +114,9 @@ void* accept_connections(void* p_sockets){
         //Grab and print the client address
         char str[40];
         inet_ntop(AF_INET, &client_addr.sin_addr, str, sizeof(str));
+        pthread_mutex_lock(&mutex);
         printf("Incomming connection! Address: %s\n\n", str);
+        pthread_mutex_unlock(&mutex);
         
         //Initialize parameter pointer, declare handle_connection thread, and create the thread
         int *pclient = malloc(sizeof(int));
@@ -146,16 +153,21 @@ void* handle_connection(void* p_connfd){
     recvbuff[n-1] = '\0';           //Remove newline from username
     strcpy(username, recvbuff);     //Put the string in the username buffer
     if(strcmp(username, "") == 0){  //Check for empty username
+        pthread_mutex_lock(&mutex);
         printf("Username NULL is not allowed! Killing connection!\n");
+        pthread_mutex_unlock(&mutex);
         close(connfd);
         pthread_exit(NULL);
     }
-
+    pthread_mutex_lock(&mutex);
     printf("Client connected! Username: %s\n", username);
+    pthread_mutex_unlock(&mutex);
     
     //Add connection to list
+    pthread_mutex_lock(&mutex);
     connections[nbr_connections] = new_connection(connfd, username);    
     nbr_connections++;
+    pthread_mutex_unlock(&mutex);
 
     //Broadcast that user has joined
     snprintf(sendbuff, sizeof(sendbuff), "%s has joined the server!\n", username);
@@ -174,7 +186,9 @@ void* handle_connection(void* p_connfd){
         //Read user message
         memset(recvbuff, 0, MAXLINE);
         while((n = read(connfd, recvbuff, MAXLINE-1)) > 0){
+            pthread_mutex_lock(&mutex);
             fprintf(stdout, "\n%s: %s", username, recvbuff);
+            pthread_mutex_unlock(&mutex);
 
             if(recvbuff[n-1] == '\n')   //check for end of message
                 break;
@@ -189,14 +203,17 @@ void* handle_connection(void* p_connfd){
             broadcast_message(sendbuff, username);
             int i;
             //Find index of user
+            pthread_mutex_lock(&mutex);
             for(i = 0; i < nbr_connections; i++){
                 if(strcmp(connections[i]->username, username) == 0)
                     break;
             }
-            //Remove user from list of connections, and shift the array to fill the hole
+            //Free the pointer, remove user from list of connections, and shift the array to fill the hole
+            free(connections[i]);
             for(int j = i; j < nbr_connections-1; j++)
                 connections[j] = connections[j+1];
             nbr_connections--;
+            pthread_mutex_unlock(&mutex);
             break;
         }
         //Prepend username to message string and broadcast to users
@@ -212,9 +229,11 @@ void* handle_connection(void* p_connfd){
 
 //Function for broadcasting message to every user except for username
 void broadcast_message(char* message, char* username){
+    pthread_mutex_lock(&mutex);
     for(int i = 0; i < nbr_connections; i++){
         if(strcmp(connections[i]->username, username) != 0){
             write(connections[i]->connfd, message, strlen(message));
         }
     }
+    pthread_mutex_unlock(&mutex);
 }
