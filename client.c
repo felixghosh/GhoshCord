@@ -4,12 +4,15 @@
 #include <locale.h>
 #include <ncurses.h>
 
-
-void* listen_to_server(void* p_sockfd);
-void err_n_exit_win(const char *fmt, ...);
-
+//Struct type-definition
 typedef struct thread_params_t thread_params_t;
 
+//Function prototypes
+void* listen_to_server(void* p_sockfd);
+void err_n_exit_win(const char *fmt, ...);
+void print_to_chat(char*** messageHistory, char message[], WINDOW* chat2, int*row, int chatWidth, int chatHeight2, int* x, int i);
+
+//Struct declaration
 struct thread_params_t{
     char*** messageHistory;
     int* row;
@@ -20,6 +23,7 @@ struct thread_params_t{
     int sockfd;
 };
 
+//Struct constructor
 thread_params_t* new_params(char*** messageHistory, int* row, int chatWidth, int chatHeight2, int* x, WINDOW *chat2, int sockfd){
     thread_params_t* params = malloc(sizeof(thread_params_t));
     params->messageHistory = messageHistory;
@@ -34,7 +38,7 @@ thread_params_t* new_params(char*** messageHistory, int* row, int chatWidth, int
 }
 
 int main(int argc, char **argv){
-    //Init data used by sockets
+    //Declare data used by sockets
     int sockfd, n, sendbytes;
     struct sockaddr_in servaddr;
     char sendbuff[MAXLINE];
@@ -47,7 +51,7 @@ int main(int argc, char **argv){
     noecho();                   //don't print all user input
     start_color();              //start colors
 
-    //Init date used by ncurses
+    //Init data used by ncurses
     int yMax, xMax, borderTop, borderSide, chatHeight, chatWidth, chatHeight2, inputHeight, inputHeight2;
     borderTop = 1;
     borderSide = 2;
@@ -58,7 +62,6 @@ int main(int argc, char **argv){
     inputHeight = yMax - chatHeight - borderTop*2;
     inputHeight2 = inputHeight - 2;
 
-    //char messageHistory[chatHeight2][1024];
     char** messageHistory = calloc(chatHeight2, sizeof(char*));
     for(int a = 0; a < chatHeight2; a++)
         messageHistory[a] = calloc(1024, sizeof(char));
@@ -67,10 +70,10 @@ int main(int argc, char **argv){
     row = x = y = 0;
 
     //Init and draw GUI
-    WINDOW *chat = newwin(chatHeight, chatWidth,borderTop,borderSide);
-    WINDOW *chat2 = newwin(chatHeight-2, chatWidth-2, borderTop+1,borderSide+1);
-    WINDOW *input = newwin(inputHeight, chatWidth, chatHeight + borderTop, borderSide);
-    WINDOW *input2 = newwin(inputHeight2, chatWidth-2, chatHeight + borderTop + 1, borderSide + 1);
+    WINDOW *chat = newwin(chatHeight, chatWidth,borderTop,borderSide);                              //Border for char
+    WINDOW *chat2 = newwin(chatHeight-2, chatWidth-2, borderTop+1,borderSide+1);                    //Internal chat box
+    WINDOW *input = newwin(inputHeight, chatWidth, chatHeight + borderTop, borderSide);             //Border for input window
+    WINDOW *input2 = newwin(inputHeight2, chatWidth-2, chatHeight + borderTop + 1, borderSide + 1); //Internal input window
     box(chat,0,0);
     box(input, 0,0);
     refresh();
@@ -83,29 +86,34 @@ int main(int argc, char **argv){
     attroff(COLOR_PAIR(1) | A_BOLD);
     refresh();
 
+    //Check for proper usage of args
     if (argc != 3){
         err_n_exit_win("usage: %s <server address> <username>", argv[0]);
     }
         
     char* username = argv[2];
 
+    //Initialize socket
     if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
         err_n_exit_win("socket error.");
 
+    //Set properties of server address
     bzero(&servaddr, sizeof(servaddr));
     servaddr.sin_family = AF_INET;
     servaddr.sin_port = htons(SERVER_PORT);
 
+    //Convert address from standard presentation from to binary form
     if(inet_pton(AF_INET, argv[1], &servaddr.sin_addr) <= 0)
         err_n_exit_win("inet_pton error.");
     
+    //Connect to server address
     if(connect(sockfd, (SA *) &servaddr, sizeof(servaddr)) < 0)
         err_n_exit_win("connect error.");
     
+    //Write username into sendbuffer and send to server
     sprintf(sendbuff, "%s\n", username);    
     sendbytes = strlen(sendbuff);
-
-    if(write(sockfd, sendbuff, sendbytes) != sendbytes) //send username to server
+    if(write(sockfd, sendbuff, sendbytes) != sendbytes)
         err_n_exit_win("write error.");
 
     memset(recvbuff, 0, MAXLINE);
@@ -124,28 +132,26 @@ int main(int argc, char **argv){
         memset(recvbuff, 0, MAXLINE);
 
     }
-
     memset(recvbuff, 0, MAXLINE);
-
     if(n < 0)
         err_n_exit_win("read error.");
 
+    //Initialize parameter pointer, create and start listen_to_server thread
     thread_params_t* p_params = new_params(&messageHistory, &row, chatWidth, chatHeight2, &x, chat2, sockfd);
-
-    //int *p_sockfd = malloc(sizeof(int));
-    //*p_sockfd = sockfd;
     pthread_t t;
     pthread_create(&t, NULL, listen_to_server, p_params);
 
-    int finished = 0;
+    int finished = 0;   //Boolean for terminating main loop
+
+    //Main loop, takes user input and writes it to server
     while(!finished){
         memset(sendbuff, 0, MAXLINE);
-
         memset(message, 0, 1024);
         i = 0;
+        //Move cursor to top left of input window
         wmove(input2, y,x);
+        //Check input for arrow keys or backspace, otherwise just echo out the input character to the input window
         while((c = wgetch(input2)) != '\n'){
-             
             switch (c)
             {
             case KEY_LEFT:
@@ -194,54 +200,22 @@ int main(int argc, char **argv){
             }
             
         }
+        //Print user message to chat
+        print_to_chat(&messageHistory, message, chat2, &row, chatWidth, chatHeight2, &x, i);
 
-        if(row < chatHeight2){
-            for(int j = 0; j < i; j++)
-                messageHistory[row + j/(chatWidth-2)][j%(chatWidth-2)] = message[j];
-            for(int j = 0; j < chatHeight2; j++)
-                mvwprintw(chat2, j, 0, "%s\n", messageHistory[j]);
-            row += x/(chatWidth-1)+1;
-            
-            
-
-        } else{
-            int messageRowLength = x/(chatWidth-1)+1;
-            for(int j = 0; j < messageRowLength; j++){
-                for(int k = 0; k < chatHeight2-1; k++){
-                    strcpy(messageHistory[k], messageHistory[k+1]);
-                    mvwprintw(chat2, k, 0, "%s\n", messageHistory[k]);
-                }
-                memset(messageHistory[row-1], 0 , 1024);
-            }
-            
-            for(int k = 0; k < x; k++)
-                messageHistory[row-1 - messageRowLength+1 + k/(chatWidth-2)][k%(chatWidth-2)] = message[k];
-            
-            for(int k = row-1 - messageRowLength; k <= row-1; k++)
-                mvwprintw(chat2, k, 0, "%s\n", messageHistory[k]);
-            
-            wrefresh(chat2);
-            
-        }
-        
-        wrefresh(chat2);
         werase(input2);
         wrefresh(input2);
         x = y = 0;
 
+        //Append newline to end of message and send to server
         char temp[2] ="0";
         temp[0] = '\n';
         strcat(message, temp);
         sendbytes = strlen(message);
         if(write(sockfd, message, sendbytes) != sendbytes)
             err_n_exit_win("write error.");
-            
-        /*sendbytes = strlen(sendbuff);
-        if(write(sockfd, sendbuff, sendbytes) != sendbytes)
-            err_n_exit_win("write error.");*/
     }
     
-
     return 0;
 }
 
@@ -262,48 +236,24 @@ void* listen_to_server(void* p_params){
     int n;
     memset(recvbuff, 0, MAXLINE); 
 
-    int finished = 0;
-    while(!finished){
+    int finished = 0;   //Boolean to terminate main loop
 
+    //Main loop, listens for messages from server and prints them to the chat
+    while(!finished){
         memset(recvbuff, 0, 1024);
         int i = 0;
         while((n = read(sockfd, recvbuff, MAXLINE-1)) > 0){ 
             i += n;
-            if(recvbuff[n-1] == '\n'){   //check for end of message
-                    
-                    break;
-            }
+            if(recvbuff[n-1] == '\n')   //check for end of message
+                break;
         }
-        if(*row < chatHeight2){
-            for(int j = 0; j < i; j++)
-                messageHistory[*row + j/(chatWidth-2)][j%(chatWidth-2)] = recvbuff[j];
-            for(int j = 0; j < chatHeight2; j++)
-                mvwprintw(chat2, j, 0, "%s\n", messageHistory[j]);
-            *row += *x/(chatWidth-1)+1;
-            wrefresh(chat2);
-        } else {
-            int messageRowLength = i/(chatWidth-1)+1;
-            for(int j = 0; j < messageRowLength; j++){
-                for(int k = 0; k < chatHeight2-1; k++){
-                    strcpy(messageHistory[k], messageHistory[k+1]);
-                    mvwprintw(chat2, k, 0, "%s\n", messageHistory[k]);
-                }
-                memset(messageHistory[*row-1], 0 , 1024);
-            }
-
-            for(int k = 0; k < i; k++)
-                messageHistory[*row-1 - messageRowLength+1 + k/(chatWidth-2)][k%(chatWidth-2)] = recvbuff[k];
-            for(int k = *row-1 - messageRowLength; k <= *row-1; k++)
-                mvwprintw(chat2, k, 0, "%s\n", messageHistory[k]);
-            
-            wrefresh(chat2);
-        }
-        wrefresh(chat2);
+        print_to_chat(&messageHistory, recvbuff, chat2, row, chatWidth, chatHeight2, x, i);
         *x = 0;
     }
     pthread_exit(NULL);
 }
 
+//Prints error message and terminates program
 void err_n_exit_win(const char *fmt, ...){
     int errno_save;
     va_list ap;
@@ -326,4 +276,43 @@ void err_n_exit_win(const char *fmt, ...){
 
     endwin();
     exit(1);
+}
+
+//Takes a message string and breaks it up into several strings to be put on different rows in messageHistory, then prints the history
+void print_to_chat(char*** p_messageHistory, char message[], WINDOW* chat2, int*row, int chatWidth, int chatHeight2, int* x, int i){
+    char** messageHistory = *p_messageHistory;
+    //If we still haven't filled the screen we can just print the message history
+        if(*row < chatHeight2){
+            //Split the message into as many rows as needed in messageHistory
+            for(int j = 0; j < i; j++)
+                messageHistory[*row + j/(chatWidth-2)][j%(chatWidth-2)] = message[j];
+            //Print the messageHistory
+            for(int j = 0; j < chatHeight2; j++)
+                mvwprintw(chat2, j, 0, "%s\n", messageHistory[j]);
+            //
+            *row += *x/(chatWidth-1)+1;
+
+        }
+        //Otherwise we need to shift out old messages and fill in the new one(s)
+        else{
+            int messageRowLength = i/(chatWidth-1)+1;
+            for(int j = 0; j < messageRowLength; j++){
+                for(int k = 0; k < chatHeight2-1; k++){
+                    strcpy(messageHistory[k], messageHistory[k+1]);
+                    mvwprintw(chat2, k, 0, "%s\n", messageHistory[k]);
+                }
+                memset(messageHistory[*row-1], 0 , 1024);
+            }
+            
+            for(int k = 0; k < i; k++)
+                messageHistory[*row-1 - messageRowLength+1 + k/(chatWidth-2)][k%(chatWidth-2)] = message[k];
+            
+            for(int k = *row-1 - messageRowLength; k <= *row-1; k++)
+                mvwprintw(chat2, k, 0, "%s\n", messageHistory[k]);
+            
+            wrefresh(chat2);
+            
+        }
+        
+        wrefresh(chat2);
 }
