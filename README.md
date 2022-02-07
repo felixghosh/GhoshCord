@@ -10,7 +10,7 @@ GhoshCord is a multithreaded terminal user-interface chat application written in
 2. Enter the directory:  
 `cd C_Chat_Server`
 
-3. If you wish to run your own server, you must define the `SERVER_PORT` macro in ´`common.h` and forward this port on the network that the server will run on. The default port is 18000. *This is step is not necessary if you only plan on running the client.*
+3. If you wish to run your own server, you must define the `SERVER_PORT` macro in `common.h` and forward this port on the network that the server will run on. The default port is 18000. *This is step is not necessary if you only plan on running the client.*
 4. Run the Makefile to compile the program:  
 `make`
 
