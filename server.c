@@ -89,17 +89,17 @@ int main(int argc, char **argv){
         }
     }
 
-    //join threads here???
+    //Cancel and join threads
     pthread_cancel(ac);
     pthread_join(ac, NULL);
+    printf("con: %d thr: %d\n", nbr_connections, nbr_threads);
     for(int i = 0; i < nbr_connections; i++){
         free(connections[i]);
         pthread_cancel(threads[i]);
-        pthread_join(threads[i], NULL);
+        //pthread_join(threads[i], NULL);
     }
     for(int i = 0; i < nbr_threads; i++)
         pthread_join(threads[i], NULL);
-    printf("done!\n");
     return 0;   //Successful termination
 }
 
@@ -139,7 +139,8 @@ void* accept_connections(void* p_sockets){
         pthread_t t;
         pthread_create(&t, NULL, handle_connection, pclient);
         pthread_mutex_lock(&mutex);
-        threads[nbr_connections] = t;
+        threads[nbr_threads] = t;
+        nbr_threads++;
         pthread_mutex_unlock(&mutex);
     }
 }
@@ -186,7 +187,6 @@ void* handle_connection(void* p_connfd){
     pthread_mutex_lock(&mutex);
     connections[nbr_connections] = new_connection(connfd, username);
     nbr_connections++;
-    nbr_threads++;
     pthread_mutex_unlock(&mutex);
 
     //Broadcast that user has joined
@@ -246,7 +246,6 @@ void* handle_connection(void* p_connfd){
         broadcast_message(message, username);
     }
     close(connfd);
-    printf("thread exiting");
     pthread_exit(NULL);
 }
 
