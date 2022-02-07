@@ -1,5 +1,6 @@
 server
 client
 window
+window.c
 *.o
 vgcore.*

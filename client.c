@@ -200,6 +200,11 @@ int main(int argc, char **argv){
             }
             
         }
+
+        if(strcmp(message, "quit") == 0){
+            finished = 1;
+            break;
+        }
         //Print user message to chat
         print_to_chat(&messageHistory, message, chat2, &row, chatWidth, chatHeight2, &x, i);
 
@@ -215,7 +220,13 @@ int main(int argc, char **argv){
         if(write(sockfd, message, sendbytes) != sendbytes)
             err_n_exit_win("write error.");
     }
-    
+
+    //Free memmory and terminate ncurses
+    for(int a = 0; a < chatHeight2; a++)
+        free(messageHistory[a]);
+    free(messageHistory);
+    delwin(stdscr);
+    endwin();
     return 0;
 }
 

@@ -92,7 +92,6 @@ int main(int argc, char **argv){
     //Cancel and join threads
     pthread_cancel(ac);
     pthread_join(ac, NULL);
-    printf("con: %d thr: %d\n", nbr_connections, nbr_threads);
     for(int i = 0; i < nbr_connections; i++){
         free(connections[i]);
         pthread_cancel(threads[i]);
