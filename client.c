@@ -10,7 +10,7 @@ typedef struct thread_params_t thread_params_t;
 //Function prototypes
 void* listen_to_server(void* p_sockfd);
 void err_n_exit_win(const char *fmt, ...);
-void print_to_chat(char*** messageHistory, char message[], WINDOW* chat2, int*row, int chatWidth, int chatHeight2, int* x, int i);
+void print_to_chat(char*** messageHistory, char message[], WINDOW* chat2, int*row, int chatWidth, int chatHeight2, int i);
 
 //Struct declaration
 struct thread_params_t{
@@ -36,6 +36,8 @@ thread_params_t* new_params(char*** messageHistory, int* row, int chatWidth, int
     return params;
 
 }
+
+static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;   //Lock for accessing shared data
 
 int main(int argc, char **argv){
     //Declare data used by sockets
@@ -66,7 +68,7 @@ int main(int argc, char **argv){
     for(int a = 0; a < chatHeight2; a++)
         messageHistory[a] = calloc(1024, sizeof(char));
     char message[1024];
-    unsigned int c, i, row, x, y;
+    int c, i, row, x, y;
     row = x = y = 0;
 
     //Init and draw GUI
@@ -82,7 +84,7 @@ int main(int argc, char **argv){
     keypad(input2, 1);
     init_pair(1, COLOR_RED, COLOR_BLACK);
     attron(COLOR_PAIR(1) | A_BOLD);
-    mvprintw(0, xMax/2 - 8, "GhoshCord 1.0.0!");
+    mvprintw(0, xMax/2 - 8, "GhoshCord 1.0.1!");
     attroff(COLOR_PAIR(1) | A_BOLD);
     refresh();
 
@@ -120,7 +122,7 @@ int main(int argc, char **argv){
 
     //read welcome message
     while((n = read(sockfd, recvbuff, MAXLINE-1)) > 0){ 
-        for(int j = 0; j < strlen(recvbuff); j++)
+        for(unsigned int j = 0; j < strlen(recvbuff); j++)
             messageHistory[row + j/(chatWidth-2)][j%(chatWidth-2)] = recvbuff[j];
         for(int j = 0; j < chatHeight2; j++)
             mvwprintw(chat2, j, 0, "%s\n", messageHistory[j]);
@@ -149,35 +151,52 @@ int main(int argc, char **argv){
         memset(message, 0, 1024);
         i = 0;
         //Move cursor to top left of input window
+        pthread_mutex_lock(&mutex);
         wmove(input2, y,x);
+        pthread_mutex_unlock(&mutex);
         //Check input for arrow keys or backspace, otherwise just echo out the input character to the input window
         while((c = wgetch(input2)) != '\n'){
+            
             switch (c)
             {
             case KEY_LEFT:
-                if(x > 0)
+                if(x > 0){
+                    pthread_mutex_lock(&mutex);
                     wmove(input2, y, --x);
+                    pthread_mutex_unlock(&mutex);
+                }
                 break;
 
             case KEY_RIGHT:
-                if(x < chatWidth-3)
+                if(x < chatWidth-3){
+                    pthread_mutex_lock(&mutex);
                     wmove(input2, y, ++x);
+                    pthread_mutex_unlock(&mutex);
+                }
                 break;
 
             case KEY_DOWN:
-                if(y < inputHeight2-1)
+                if(y < inputHeight2-1){
+                    pthread_mutex_lock(&mutex);
                     wmove(input2, ++y, x);
+                    pthread_mutex_unlock(&mutex);
+                }
                 break;
             case KEY_UP:
-                if(y > 0)
+                if(y > 0){
+                    pthread_mutex_lock(&mutex);
                     wmove(input2, --y, x);
+                    pthread_mutex_unlock(&mutex);
+                }
                 break;
             case 127:   //backspace
                 if(x == 0)
                     break;
+                pthread_mutex_lock(&mutex);
                 for(int j = --x; j < i; j++){
                     message[j] = message[j+1];
                 }
+                pthread_mutex_unlock(&mutex);
                 werase(input2);
                 mvwprintw(input2, y, 0, "%s", message);
                 wmove(input2, y,x);
@@ -206,11 +225,13 @@ int main(int argc, char **argv){
             break;
         }
         //Print user message to chat
-        print_to_chat(&messageHistory, message, chat2, &row, chatWidth, chatHeight2, &x, i);
+        print_to_chat(&messageHistory, message, chat2, &row, chatWidth, chatHeight2, i);
 
         werase(input2);
         wrefresh(input2);
+        pthread_mutex_lock(&mutex);
         x = y = 0;
+        pthread_mutex_unlock(&mutex);
 
         //Append newline to end of message and send to server
         char temp[2] ="0";
@@ -258,8 +279,10 @@ void* listen_to_server(void* p_params){
             if(recvbuff[n-1] == '\n')   //check for end of message
                 break;
         }
-        print_to_chat(&messageHistory, recvbuff, chat2, row, chatWidth, chatHeight2, x, i);
+        print_to_chat(&messageHistory, recvbuff, chat2, row, chatWidth, chatHeight2, i);
+        pthread_mutex_lock(&mutex);
         *x = 0;
+        pthread_mutex_unlock(&mutex);
     }
     pthread_exit(NULL);
 }
@@ -290,8 +313,9 @@ void err_n_exit_win(const char *fmt, ...){
 }
 
 //Takes a message string and breaks it up into several strings to be put on different rows in messageHistory, then prints the history
-void print_to_chat(char*** p_messageHistory, char message[], WINDOW* chat2, int*row, int chatWidth, int chatHeight2, int* x, int i){
+void print_to_chat(char*** p_messageHistory, char message[], WINDOW* chat2, int*row, int chatWidth, int chatHeight2, int i){
     char** messageHistory = *p_messageHistory;
+    pthread_mutex_lock(&mutex);
     //If we still haven't filled the screen we can just print the message history
         if(*row < chatHeight2){
             //Split the message into as many rows as needed in messageHistory
@@ -300,8 +324,8 @@ void print_to_chat(char*** p_messageHistory, char message[], WINDOW* chat2, int*
             //Print the messageHistory
             for(int j = 0; j < chatHeight2; j++)
                 mvwprintw(chat2, j, 0, "%s\n", messageHistory[j]);
-            //
-            *row += *x/(chatWidth-1)+1;
+            //Update value of row
+            *row += i/(chatWidth-1)+1;
 
         }
         //Otherwise we need to shift out old messages and fill in the new one(s)
@@ -326,4 +350,5 @@ void print_to_chat(char*** p_messageHistory, char message[], WINDOW* chat2, int*
         }
         
         wrefresh(chat2);
+        pthread_mutex_unlock(&mutex);
 }
