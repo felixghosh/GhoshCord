@@ -38,6 +38,7 @@ thread_params_t* new_params(char*** messageHistory, int* row, int chatWidth, int
 }
 
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;   //Lock for accessing shared data
+WINDOW *chat2;
 
 int main(int argc, char **argv){
     //Declare data used by sockets
@@ -73,7 +74,7 @@ int main(int argc, char **argv){
 
     //Init and draw GUI
     WINDOW *chat = newwin(chatHeight, chatWidth,borderTop,borderSide);                              //Border for char
-    WINDOW *chat2 = newwin(chatHeight-2, chatWidth-2, borderTop+1,borderSide+1);                    //Internal chat box
+    chat2 = newwin(chatHeight-2, chatWidth-2, borderTop+1,borderSide+1);                    //Internal chat box
     WINDOW *input = newwin(inputHeight, chatWidth, chatHeight + borderTop, borderSide);             //Border for input window
     WINDOW *input2 = newwin(inputHeight2, chatWidth-2, chatHeight + borderTop + 1, borderSide + 1); //Internal input window
     box(chat,0,0);
@@ -122,6 +123,13 @@ int main(int argc, char **argv){
 
     //read welcome message
     while((n = read(sockfd, recvbuff, MAXLINE-1)) > 0){ 
+        char errCheck[6] = "";
+        for(int i = 0; i < 5; i++)
+            errCheck[i] = recvbuff[i];
+        printf("%s", errCheck);
+        refresh();
+        if(strcmp(errCheck, "Error") == 0)
+            err_n_exit_win(recvbuff);
         for(unsigned int j = 0; j < strlen(recvbuff); j++)
             messageHistory[row + j/(chatWidth-2)][j%(chatWidth-2)] = recvbuff[j];
         for(int j = 0; j < chatHeight2; j++)
@@ -287,18 +295,13 @@ void* listen_to_server(void* p_params){
     pthread_exit(NULL);
 }
 
-//Prints error message and terminates program
+//Prints error message and terminates program. Needed local version to terminate ncurses
 void err_n_exit_win(const char *fmt, ...){
     int errno_save;
-    va_list ap;
 
     errno_save = errno; //any system or library call can set errno, so we need to save it here
-
-    //print out the fmt+args to standard out
-    va_start(ap, fmt);
-    vfprintf(stdout, fmt, ap);
-    fprintf(stdout, "\n");
-    fflush(stdout);
+    wprintw(chat2, fmt);
+    wrefresh(chat2);
 
     //print out error message if erno was set
     if(errno_save) {
@@ -306,8 +309,8 @@ void err_n_exit_win(const char *fmt, ...){
         fprintf(stdout, "\n");
         fflush(stdout);
     }
-    va_end(ap);
 
+    getch();
     endwin();
     exit(1);
 }
@@ -344,11 +347,7 @@ void print_to_chat(char*** p_messageHistory, char message[], WINDOW* chat2, int*
             
             for(int k = *row-1 - messageRowLength; k <= *row-1; k++)
                 mvwprintw(chat2, k, 0, "%s\n", messageHistory[k]);
-            
-            wrefresh(chat2);
-            
         }
-        
         wrefresh(chat2);
         pthread_mutex_unlock(&mutex);
 }

@@ -175,9 +175,22 @@ void* handle_connection(void* p_connfd){
         pthread_mutex_lock(&mutex);
         printf("Username NULL is not allowed! Killing connection!\n");
         pthread_mutex_unlock(&mutex);
+        snprintf(sendbuff, sizeof(sendbuff), "Error! Username NULL is not allowed! Killing connection!\n");
+        write(connfd, sendbuff, strlen(sendbuff));
         close(connfd);
         pthread_exit(NULL);
     }
+    for(int i = 0; i < nbr_connections; i++)
+        if(strcmp(username, connections[i]->username) == 0){
+            pthread_mutex_lock(&mutex);
+            printf("Username exits in current connections already! Killing connection!\n");
+            pthread_mutex_unlock(&mutex);
+            snprintf(sendbuff, sizeof(sendbuff), "Error! Username %s Is already taken! Killing connection!\n", username);
+            write(connfd, sendbuff, strlen(sendbuff));
+            sleep(2);
+            close(connfd);
+            pthread_exit(NULL);
+        }
     pthread_mutex_lock(&mutex);
     printf("Client connected! Username: %s\n", username);
     pthread_mutex_unlock(&mutex);
