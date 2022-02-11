@@ -164,47 +164,47 @@ int main(int argc, char **argv){
         pthread_mutex_unlock(&mutex);
         //Check input for arrow keys or backspace, otherwise just echo out the input character to the input window
         while((c = wgetch(input2)) != '\n'){
-            
+            pthread_mutex_lock(&mutex);
             switch (c)
             {
             case KEY_LEFT:
                 if(x > 0){
-                    pthread_mutex_lock(&mutex);
+                    
                     wmove(input2, y, --x);
-                    pthread_mutex_unlock(&mutex);
+                    
                 }
                 break;
 
             case KEY_RIGHT:
                 if(x < chatWidth-3){
-                    pthread_mutex_lock(&mutex);
+                    //pthread_mutex_lock(&mutex);
                     wmove(input2, y, ++x);
-                    pthread_mutex_unlock(&mutex);
+                    //pthread_mutex_unlock(&mutex);
                 }
                 break;
 
             case KEY_DOWN:
                 if(y < inputHeight2-1){
-                    pthread_mutex_lock(&mutex);
+                    //pthread_mutex_lock(&mutex);
                     wmove(input2, ++y, x);
-                    pthread_mutex_unlock(&mutex);
+                    //pthread_mutex_unlock(&mutex);
                 }
                 break;
             case KEY_UP:
                 if(y > 0){
-                    pthread_mutex_lock(&mutex);
+                    //pthread_mutex_lock(&mutex);
                     wmove(input2, --y, x);
-                    pthread_mutex_unlock(&mutex);
+                    //pthread_mutex_unlock(&mutex);
                 }
                 break;
             case 127:   //backspace
                 if(x == 0)
                     break;
-                pthread_mutex_lock(&mutex);
+                //pthread_mutex_lock(&mutex);
                 for(int j = --x; j < i; j++){
                     message[j] = message[j+1];
                 }
-                pthread_mutex_unlock(&mutex);
+                //pthread_mutex_unlock(&mutex);
                 werase(input2);
                 mvwprintw(input2, y, 0, "%s", message);
                 wmove(input2, y,x);
@@ -225,6 +225,7 @@ int main(int argc, char **argv){
                 wrefresh(input2);
                 i++;
             }
+            pthread_mutex_unlock(&mutex);
             
         }
 
@@ -289,7 +290,7 @@ void* listen_to_server(void* p_params){
         }
         print_to_chat(&messageHistory, recvbuff, chat2, row, chatWidth, chatHeight2, i);
         pthread_mutex_lock(&mutex);
-        *x = 0;
+        //*x = 0;
         pthread_mutex_unlock(&mutex);
     }
     pthread_exit(NULL);
