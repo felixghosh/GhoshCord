@@ -48,6 +48,11 @@ int main(int argc, char **argv){
     char sendbuff[MAXLINE];
     char recvbuff[MAXLINE];
 
+    //Check for proper usage of args
+    if (argc != 3){
+        err_n_die("usage: %s <server address> <username>", argv[0]);
+    }
+
     //Initialize ncurses
     setlocale(LC_CTYPE, "");    //Set locale for utf8
     initscr();                  //Initialize screen
@@ -90,10 +95,7 @@ int main(int argc, char **argv){
     attroff(COLOR_PAIR(1) | A_BOLD);
     refresh();
 
-    //Check for proper usage of args
-    if (argc != 3){
-        err_n_exit_win("usage: %s <server address> <username>", argv[0]);
-    }
+    
         
     char* username = argv[2];
 
