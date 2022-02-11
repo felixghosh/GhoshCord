@@ -10,7 +10,7 @@ typedef struct thread_params_t thread_params_t;
 //Function prototypes
 void* listen_to_server(void* p_sockfd);
 void err_n_exit_win(const char *fmt, ...);
-void print_to_chat(char*** messageHistory, char message[], WINDOW* chat2, int*row, int chatWidth, int chatHeight2, int i);
+void print_to_chat(char*** messageHistory, char message[], WINDOW* chat2, int*row, int chatWidth, int chatHeight2, int i, int* x);
 
 //Struct declaration
 struct thread_params_t{
@@ -39,6 +39,7 @@ thread_params_t* new_params(char*** messageHistory, int* row, int chatWidth, int
 
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;   //Lock for accessing shared data
 WINDOW *chat2;
+WINDOW *input2;
 
 int main(int argc, char **argv){
     //Declare data used by sockets
@@ -76,7 +77,7 @@ int main(int argc, char **argv){
     WINDOW *chat = newwin(chatHeight, chatWidth,borderTop,borderSide);                              //Border for char
     chat2 = newwin(chatHeight-2, chatWidth-2, borderTop+1,borderSide+1);                    //Internal chat box
     WINDOW *input = newwin(inputHeight, chatWidth, chatHeight + borderTop, borderSide);             //Border for input window
-    WINDOW *input2 = newwin(inputHeight2, chatWidth-2, chatHeight + borderTop + 1, borderSide + 1); //Internal input window
+    input2 = newwin(inputHeight2, chatWidth-2, chatHeight + borderTop + 1, borderSide + 1); //Internal input window
     box(chat,0,0);
     box(input, 0,0);
     refresh();
@@ -234,7 +235,7 @@ int main(int argc, char **argv){
             break;
         }
         //Print user message to chat
-        print_to_chat(&messageHistory, message, chat2, &row, chatWidth, chatHeight2, i);
+        print_to_chat(&messageHistory, message, chat2, &row, chatWidth, chatHeight2, i, &x);
 
         werase(input2);
         wrefresh(input2);
@@ -288,7 +289,7 @@ void* listen_to_server(void* p_params){
             if(recvbuff[n-1] == '\n')   //check for end of message
                 break;
         }
-        print_to_chat(&messageHistory, recvbuff, chat2, row, chatWidth, chatHeight2, i);
+        print_to_chat(&messageHistory, recvbuff, chat2, row, chatWidth, chatHeight2, i, x);
         pthread_mutex_lock(&mutex);
         //*x = 0;
         pthread_mutex_unlock(&mutex);
@@ -317,7 +318,7 @@ void err_n_exit_win(const char *fmt, ...){
 }
 
 //Takes a message string and breaks it up into several strings to be put on different rows in messageHistory, then prints the history
-void print_to_chat(char*** p_messageHistory, char message[], WINDOW* chat2, int*row, int chatWidth, int chatHeight2, int i){
+void print_to_chat(char*** p_messageHistory, char message[], WINDOW* chat2, int*row, int chatWidth, int chatHeight2, int i, int* x){
     char** messageHistory = *p_messageHistory;
     pthread_mutex_lock(&mutex);
     //If we still haven't filled the screen we can just print the message history
@@ -350,5 +351,7 @@ void print_to_chat(char*** p_messageHistory, char message[], WINDOW* chat2, int*
                 mvwprintw(chat2, k, 0, "%s\n", messageHistory[k]);
         }
         wrefresh(chat2);
+        wmove(input2, 0, *x);
+        wrefresh(input2);
         pthread_mutex_unlock(&mutex);
 }
