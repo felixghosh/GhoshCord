@@ -169,43 +169,28 @@ int main(int argc, char **argv){
             switch (c)
             {
             case KEY_LEFT:
-                if(x > 0){
-                    
+                if(x > 0)
                     wmove(input2, y, --x);
-                    
-                }
                 break;
 
             case KEY_RIGHT:
-                if(x < chatWidth-3){
-                    //pthread_mutex_lock(&mutex);
+                if(x < chatWidth-3)
                     wmove(input2, y, ++x);
-                    //pthread_mutex_unlock(&mutex);
-                }
                 break;
 
             case KEY_DOWN:
-                if(y < inputHeight2-1){
-                    //pthread_mutex_lock(&mutex);
+                if(y < inputHeight2-1)
                     wmove(input2, ++y, x);
-                    //pthread_mutex_unlock(&mutex);
-                }
                 break;
             case KEY_UP:
-                if(y > 0){
-                    //pthread_mutex_lock(&mutex);
+                if(y > 0)
                     wmove(input2, --y, x);
-                    //pthread_mutex_unlock(&mutex);
-                }
                 break;
             case 127:   //backspace
                 if(x == 0)
                     break;
-                //pthread_mutex_lock(&mutex);
-                for(int j = --x; j < i; j++){
+                for(int j = --x; j < i; j++)
                     message[j] = message[j+1];
-                }
-                //pthread_mutex_unlock(&mutex);
                 werase(input2);
                 mvwprintw(input2, y, 0, "%s", message);
                 wmove(input2, y,x);
