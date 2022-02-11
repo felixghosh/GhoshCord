@@ -84,7 +84,8 @@ int main(int argc, char **argv){
             pthread_mutex_lock(&mutex);
             printf("\nServer shutting down!\n");
             pthread_mutex_unlock(&mutex);
-            broadcast_message("\n#####################\nSERVER SHUTTING DOWN!\n#####################\n", "");
+            broadcast_message("###########SERVER SHUTTING DOWN!###########\n", "");
+            //sleep(2);
             finished = 1;
         }
     }

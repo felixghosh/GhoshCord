@@ -37,9 +37,11 @@ thread_params_t* new_params(char*** messageHistory, int* row, int chatWidth, int
 
 }
 
+//Global variables
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;   //Lock for accessing shared data
-WINDOW *chat2;
-WINDOW *input2;
+WINDOW *chat2;                                              //Inner chat window
+WINDOW *input2;                                             //Inner input window
+int finished;                                               //Bolean for terminating program
 
 int main(int argc, char **argv){
     //Declare data used by sockets
@@ -154,7 +156,7 @@ int main(int argc, char **argv){
     pthread_t t;
     pthread_create(&t, NULL, listen_to_server, p_params);
 
-    int finished = 0;   //Boolean for terminating main loop
+    finished = 0;   //Boolean for terminating main loop
 
     //Main loop, takes user input and writes it to server
     while(!finished){
@@ -166,7 +168,7 @@ int main(int argc, char **argv){
         wmove(input2, y,x);
         pthread_mutex_unlock(&mutex);
         //Check input for arrow keys or backspace, otherwise just echo out the input character to the input window
-        while((c = wgetch(input2)) != '\n'){
+        while((c = wgetch(input2)) != '\n' && !finished){
             pthread_mutex_lock(&mutex);
             switch (c)
             {
@@ -243,6 +245,8 @@ int main(int argc, char **argv){
     for(int a = 0; a < chatHeight2; a++)
         free(messageHistory[a]);
     free(messageHistory);
+    pthread_cancel(t);
+    pthread_join(t, NULL);
     delwin(stdscr);
     endwin();
     return 0;
@@ -265,7 +269,7 @@ void* listen_to_server(void* p_params){
     int n;
     memset(recvbuff, 0, MAXLINE); 
 
-    int finished = 0;   //Boolean to terminate main loop
+    finished = 0;   //Boolean to terminate main loop
 
     //Main loop, listens for messages from server and prints them to the chat
     while(!finished){
@@ -276,10 +280,14 @@ void* listen_to_server(void* p_params){
             if(recvbuff[n-1] == '\n')   //check for end of message
                 break;
         }
+
+        //Check for server termination
+        if(strcmp(recvbuff, "") == 0){
+            wprintw(chat2, "The server has shut down. Killing connection!");
+            wrefresh(chat2);
+            finished = 1;
+        }
         print_to_chat(&messageHistory, recvbuff, chat2, row, chatWidth, chatHeight2, i, x);
-        pthread_mutex_lock(&mutex);
-        //*x = 0;
-        pthread_mutex_unlock(&mutex);
     }
     pthread_exit(NULL);
 }
