@@ -55,6 +55,10 @@ int main(int argc, char **argv){
     if((listenfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) 
         err_n_die("socket error.");
 
+    //Set address to be reusable
+    if (setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int)) < 0)
+        err_n_die("setsockopt(SO_REUSEADDR) failed");
+
     //Set properties of server address
     memset(&servaddr, 0, sizeof(servaddr));         //zero it out
     servaddr.sin_family = AF_INET;                  //set address familiy to ip
