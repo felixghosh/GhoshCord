@@ -5,7 +5,7 @@ GhoshCord is a multithreaded terminal user-interface chat application written in
 ## Installation
 
 1. Clone this repository:  
-`git clone https://github.com/felixghosh/C_Chat_Server`
+`git clone https://github.com/felixghosh/GhoshCord.git`
 
 2. Enter the directory:  
 `cd C_Chat_Server`

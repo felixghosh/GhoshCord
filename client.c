@@ -168,7 +168,7 @@ int main(int argc, char **argv){
         wmove(input2, y,x);
         pthread_mutex_unlock(&mutex);
         //Check input for arrow keys or backspace, otherwise just echo out the input character to the input window
-        while((c = wgetch(input2)) != '\n' && !finished){
+        while((c = wgetch(input2)) != '\n' && !finished && x < 1024){
             pthread_mutex_lock(&mutex);
             switch (c)
             {
@@ -190,29 +190,33 @@ int main(int argc, char **argv){
                 if(y > 0)
                     wmove(input2, --y, x);
                 break;
-            case 127:   //backspace
+            case KEY_BACKSPACE:   //backspace
                 if(x == 0)
                     break;
-                for(int j = --x; j < i; j++)
+                for(int j = --x; j < i; j++){
                     message[j] = message[j+1];
+                    i--;
+                }
+ 
                 werase(input2);
                 mvwprintw(input2, y, 0, "%s", message);
                 wmove(input2, y,x);
                 break;
             
             default:
-                if(x!=i){
-                    for(int j = i+1; j>x; j--)
-                        message[j] = message[j-1];
-                }
                 message[x++] = c;
-                
-                mvwprintw(input2, y, 0, "%s ", message);
-                werase(input2);     //hacky way to get utf8 characters to work in the input box
-                wrefresh(input2);
-                mvwprintw(input2, y, 0, "%s", message);
-                wmove(input2, y, x);
-                wrefresh(input2);
+
+                //Check if second byte of utf-8 char, then back cursor up one space
+                if((c & 0xC0) == 0x80){
+                    i -= 1;
+                }
+
+                //Only print char if this is not first byte of utf8-char
+                if((c & 0xC0) != 0xC0){
+                    mvwprintw(input2, y, 0, "%s", message);
+                    wmove(input2, y, i+1);
+                    wrefresh(input2);
+                }
                 i++;
             }
             pthread_mutex_unlock(&mutex);
