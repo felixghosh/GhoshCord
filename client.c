@@ -191,21 +191,39 @@ int main(int argc, char **argv){
                     wmove(input2, --y, x);
                 break;
             case KEY_BACKSPACE:   //backspace
+                //TODO Fix deletion of utf8-char
                 if(x == 0)
                     break;
-                for(int j = --x; j < i; j++){
-                    message[j] = message[j+1];
+                //printf("x:%d i:%d\n", x, i);
+                int j = x;
+                if((message[j] & 0xC0) == 0x80){
+                    for(j; j < i; j++){
+                        message[j-1] = message[j+1];
+                    }
+                    message[j-1] = '\0';
+                    i-=2;
+                }
+                else{
+                    j = x-1;
+                    for(j; j < i-1; j++){
+                        message[j] = message[j+1];
+                    }
+                    message[j] = '\0';
                     i--;
                 }
+                
  
                 werase(input2);
                 mvwprintw(input2, y, 0, "%s", message);
-                wmove(input2, y,x);
+                wmove(input2, y, --x);
+                wrefresh(input2);
                 break;
             
             default:
                 message[i++] = c;
                 x++;
+
+                //TODO Fix insertion in middle of line
 
                 //Check if second byte of utf-8 char, then back cursor up one space
                 if((c & 0xC0) == 0x80){
