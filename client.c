@@ -96,7 +96,11 @@ int main(int argc, char **argv){
     wrefresh(input);
     keypad(input2, 1);
     init_pair(1, COLOR_RED, COLOR_BLACK);
-    init_pair(2, COLOR_CYAN, COLOR_BLACK);
+    init_pair(2, COLOR_GREEN, COLOR_BLACK);
+    init_pair(3, COLOR_YELLOW, COLOR_BLACK);
+    init_pair(4, COLOR_BLUE, COLOR_BLACK);
+    init_pair(5, COLOR_MAGENTA, COLOR_BLACK);
+    init_pair(6, COLOR_CYAN, COLOR_BLACK);
     attron(COLOR_PAIR(1) | A_BOLD);
     mvprintw(0, xMax/2 - 8, "GhoshCord 1.0.1!");
     attroff(COLOR_PAIR(1) | A_BOLD);
@@ -411,10 +415,12 @@ void print_to_chat(char*** p_messageHistory, char message[], WINDOW* chat2, int*
     }
     
     int username_len = 0;
+    unsigned int username_color_pair = 0;
     if(has_username){
         while(message[username_len] != ':')
             username_len++;
         username_len += 2;
+        username_color_pair = ((unsigned int)message[0]) % 6 + 1;
     }
     int message_total_len = username_len + message_bytes_len;
             
@@ -425,17 +431,17 @@ void print_to_chat(char*** p_messageHistory, char message[], WINDOW* chat2, int*
                 messageHistory[*row + j/(chatWidth-2)][j%(chatWidth-2)] = message[j];
             //Print the messageHistory
             for(int j = 0; j < chatHeight2; j++){
-                
-                wattron(chat2, COLOR_PAIR(2) | A_BOLD);
+                username_color_pair = ((unsigned int)messageHistory[j][0]) % 6 + 1;
+                wattron(chat2, COLOR_PAIR(username_color_pair) | A_BOLD);
                 if(j == 0)
-                    wattroff(chat2, COLOR_PAIR(2) | A_BOLD);
+                    wattroff(chat2, COLOR_PAIR(username_color_pair) | A_BOLD);
 
                 int x_pos = 0;
                 int index = 0;
                 for(x_pos; x_pos < message_total_len; x_pos++){
                     char c = messageHistory[j][index];
                     if(c == ':')
-                        wattroff(chat2, COLOR_PAIR(2) | A_BOLD);
+                        wattroff(chat2, COLOR_PAIR(username_color_pair) | A_BOLD);
                     if((c & 0xC0) == 0xC0){
                         char utf8_char[3] = {c, messageHistory[j][index+1], 0};
                         mvwprintw(chat2, j, x_pos, "%s", utf8_char);
@@ -458,16 +464,17 @@ void print_to_chat(char*** p_messageHistory, char message[], WINDOW* chat2, int*
             memset(messageHistory[0], 0, 1024);
             for(int j = 0; j < messageRowLength; j++){
                 for(int k = 0; k < chatHeight2-1; k++){
+                    username_color_pair = ((unsigned int)messageHistory[k+1][0]) % 6 + 1;
                     strcpy(messageHistory[k], messageHistory[k+1]);
                     
-                    wattron(chat2, COLOR_PAIR(2) | A_BOLD);
+                    wattron(chat2, COLOR_PAIR(username_color_pair) | A_BOLD);
                     int x_pos = 0;
                     int index = 0;
                     for(x_pos; x_pos < u8strlen(messageHistory[k]); x_pos++){
                         char c = messageHistory[k][index];
                         
                         if(c == ':')
-                            wattroff(chat2, COLOR_PAIR(2) | A_BOLD);
+                            wattroff(chat2, COLOR_PAIR(username_color_pair) | A_BOLD);
 
                         if((c & 0xC0) == 0xC0){
                             char utf8_char[3] = {c, messageHistory[k][index+1], 0};
@@ -488,14 +495,15 @@ void print_to_chat(char*** p_messageHistory, char message[], WINDOW* chat2, int*
                 messageHistory[*row-1 - messageRowLength+1 + k/(chatWidth-2)][k%(chatWidth-2)] = message[k];
             
             for(int k = *row-1 - messageRowLength; k <= *row-1; k++){
-                wattron(chat2, COLOR_PAIR(2) | A_BOLD);
+                username_color_pair = ((unsigned int)messageHistory[k][0]) % 6 + 1;
+                wattron(chat2, COLOR_PAIR(username_color_pair) | A_BOLD);
                     int x_pos = 0;
                     int index = 0;
                     for(x_pos; x_pos < u8strlen(messageHistory[k]); x_pos++){
                         char c = messageHistory[k][index];
                         
                         if(c == ':')
-                            wattroff(chat2, COLOR_PAIR(2) | A_BOLD);
+                            wattroff(chat2, COLOR_PAIR(username_color_pair) | A_BOLD);
 
                         if((c & 0xC0) == 0xC0){
                             char utf8_char[3] = {c, messageHistory[k][index+1], 0};
