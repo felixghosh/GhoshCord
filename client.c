@@ -204,20 +204,20 @@ int main(int argc, char **argv){
                 break;
             
             default:
-                message[x++] = c;
+                message[i++] = c;
+                x++;
 
                 //Check if second byte of utf-8 char, then back cursor up one space
                 if((c & 0xC0) == 0x80){
-                    i -= 1;
+                    x--;
                 }
 
                 //Only print char if this is not first byte of utf8-char
                 if((c & 0xC0) != 0xC0){
                     mvwprintw(input2, y, 0, "%s", message);
-                    wmove(input2, y, i+1);
+                    wmove(input2, y, x);
                     wrefresh(input2);
                 }
-                i++;
             }
             pthread_mutex_unlock(&mutex);
             
