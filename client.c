@@ -149,7 +149,7 @@ int main(int argc, char **argv){
             messageHistory[row + j/(chatWidth-2)][j%(chatWidth-2)] = recvbuff[j];
         for(int j = 0; j < chatHeight2; j++)
             mvwprintw(chat2, j, 0, "%s\n", messageHistory[j]);
-        row += x/(chatWidth-1)+1;
+        row += x/(chatWidth-2)+1;
         wrefresh(chat2);
 
         if(recvbuff[n-1] == '\n')   //check for end of message
@@ -244,6 +244,8 @@ int main(int argc, char **argv){
                 break;
             
             default:
+                if(u8strlen(message) >= (inputHeight-2)*(chatWidth-2))
+                    break;
                 if(x != u8strlen(message)){
                     bool inc_x = false;
                     //Shift all chars to the right to insert in the middle of the line
@@ -309,7 +311,7 @@ int main(int argc, char **argv){
                 //Update y value if x wraps around to new line
                 if(x % (chatWidth-2) == 0)
                     y++;
-
+                
                 wmove(input2, y, x % (chatWidth-2));
                 wrefresh(input2);
 
@@ -464,13 +466,13 @@ void print_to_chat(char*** p_messageHistory, char message[], WINDOW* chat2, int*
                 
             }
             //Update value of row
-            *row += (message_total_len)/(chatWidth-1)+1;
+            *row += (message_total_len)/(chatWidth-2)+1;
 
         }
         //Otherwise we need to shift out old messages and fill in the new one(s)
         else{
             werase(chat2);
-            int messageRowLength = (message_total_len)/(chatWidth-1)+1;
+            int messageRowLength = (message_total_len)/(chatWidth-2)+1;
             memset(messageHistory[0], 0, 1024);
             for(int j = 0; j < messageRowLength; j++){
                 for(int k = 0; k < chatHeight2-1; k++){
@@ -500,8 +502,7 @@ void print_to_chat(char*** p_messageHistory, char message[], WINDOW* chat2, int*
                 }
                 memset(messageHistory[*row-1], 0 , 1024);
             }
-            
-            //TODO This line causes a potentianl seg_fault on a big paste
+
             for(int k = 0; k < message_total_len; k++)
                 messageHistory[*row-1 - messageRowLength+1 + k/(chatWidth-2)][k%(chatWidth-2)] = message[k];
             
