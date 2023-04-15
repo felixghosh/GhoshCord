@@ -175,7 +175,7 @@ int main(int argc, char **argv){
         i = 0;
         //Move cursor to top left of input window
         pthread_mutex_lock(&mutex);
-        wmove(input2, y,x);
+        wmove(input2, 0, x % (chatWidth-2));
         pthread_mutex_unlock(&mutex);
         //Check input for arrow keys or backspace, otherwise just echo out the input character to the input window
         while((c = wgetch(input2)) != '\n' && !finished && i < 1024){
@@ -238,8 +238,8 @@ int main(int argc, char **argv){
                 
  
                 werase(input2);
-                mvwprintw(input2, y, 0, "%s", message);
-                wmove(input2, y, --x);
+                mvwprintw(input2, 0, 0, "%s", message);
+                wmove(input2, y, --x % (chatWidth-2));
                 wrefresh(input2);
                 break;
             
@@ -529,7 +529,7 @@ void print_to_chat(char*** p_messageHistory, char message[], WINDOW* chat2, int*
             }
         }
         wrefresh(chat2);
-        wmove(input2, 0, x);
+        wmove(input2, 0, x % (chatWidth-2));
         wrefresh(input2);
         pthread_mutex_unlock(&mutex);
 }
