@@ -10,10 +10,11 @@ typedef struct thread_params_t thread_params_t;
 //Function prototypes
 void* listen_to_server(void* p_sockfd);
 void err_n_exit_win(const char *fmt, ...);
-void print_to_chat(char*** messageHistory, char message[], WINDOW* chat2, int*row, int chatWidth, int chatHeight2, int i, int* x);
+void print_to_chat(char*** messageHistory, char message[], WINDOW* chat2, int*row, int chatWidth, int chatHeight2, int i, int x);
 int u8strlen(const char *s);
 int u8str_index(const char *s, int index);
 int u8str_index_first(const char *s, int index);
+bool hasUsername(const char* message);
 
 //Struct declaration
 struct thread_params_t{
@@ -182,28 +183,43 @@ int main(int argc, char **argv){
             switch (c)
             {
             case KEY_LEFT:
-                if(x > 0)
-                    wmove(input2, y, --x);
+                if(x > 0){
+                    if((--x % (chatWidth-2)) == (chatWidth-3))
+                        y--;
+                    wmove(input2, y, x % (chatWidth-2));
+                }
                 break;
 
             case KEY_RIGHT:
-                if(x < chatWidth-3)
-                    wmove(input2, y, ++x);
+                if(x < u8strlen(message)){
+                    if(++x % (chatWidth-2) == 0)
+                        y++;
+                    wmove(input2, y, x % (chatWidth-2));
+                }
                 break;
 
             case KEY_DOWN:
                 if(y < inputHeight2-1)
-                    wmove(input2, ++y, x);
+                    if(x + (chatWidth-2) <= u8strlen(message)){
+                        x += (chatWidth-2);
+                        y++;
+                        wmove(input2, y, x % (chatWidth-2));
+                    }
+                    
                 break;
             case KEY_UP:
-                if(y > 0)
-                    wmove(input2, --y, x);
+                if(y > 0){
+                    x -= (chatWidth-2);
+                    y--;
+                    wmove(input2, y, x % (chatWidth-2));
+                }
+                    
                 break;
-            case KEY_BACKSPACE:   //backspace
+            case KEY_BACKSPACE:
                 if(x == 0)
                     break;
-                //printf("x:%d i:%d\n", x, i);
-                int j = u8str_index(message, x);
+                int j = u8str_index(message, x)-1;
+                wrefresh(input2);
                 if((message[j] & 0xC0) == 0x80){
                     for(j; j < i; j++){
                         message[j-1] = message[j+1];
@@ -232,7 +248,6 @@ int main(int argc, char **argv){
                     bool inc_x = false;
                     //Shift all chars to the right to insert in the middle of the line
                     char next_char = message[u8str_index(message,x)];
-                    mvwprintw(input2, y+i*3-5, 0, "c:%x  %x %x %x %x %x", (char)c, message[0], message[1], message[2], message[3], message[4]);
                     if((next_char & 0XC0) == 0X80){
                         //Next char is utf-8 char
                         if((c & 0XC0) == 0XC0){
@@ -261,7 +276,6 @@ int main(int argc, char **argv){
                             message[j] = message[j-1];
                     }
 
-                    mvwprintw(input2, y+i*3-4, 0, "c:%x  %x %x %x %x %x", (char)c, message[0], message[1], message[2], message[3], message[4]);
                     if((c & 0XC0) == 0XC0)
                         message[u8str_index(message, x)] = (char)c;
                     else if((c & 0XC0) == 0X80){
@@ -271,11 +285,9 @@ int main(int argc, char **argv){
                     else
                         message[u8str_index(message, x++)] = (char)c;
                         
-                    mvwprintw(input2, y+i*3-3, 0, "c:%x  %x %x %x %x %x", (char)c, message[0], message[1], message[2], message[3], message[4]);
                     i++;
                     if(inc_x)
                         x++;
-                    
                     
                     
                 } else {
@@ -291,10 +303,16 @@ int main(int argc, char **argv){
                 //Only print char if this is not first byte of utf8-char
                 if((c & 0xC0) != 0xC0){
                     // werase(input2);
-                    mvwprintw(input2, y, 0, "%s", message);
-                    wmove(input2, y, x);
-                    wrefresh(input2);
+                    mvwprintw(input2, 0, 0, "%s", message);
                 }
+                
+                //Update y value if x wraps around to new line
+                if(x % (chatWidth-2) == 0)
+                    y++;
+
+                wmove(input2, y, x % (chatWidth-2));
+                wrefresh(input2);
+
             }
             pthread_mutex_unlock(&mutex);
             
@@ -313,7 +331,7 @@ int main(int argc, char **argv){
         werase(input2);
         wrefresh(input2);
 
-        print_to_chat(&messageHistory, fullmessage, chat2, &row, chatWidth, chatHeight2, i, &x);
+        print_to_chat(&messageHistory, fullmessage, chat2, &row, chatWidth, chatHeight2, i, x);
 
         
         pthread_mutex_lock(&mutex);
@@ -375,7 +393,7 @@ void* listen_to_server(void* p_params){
             wrefresh(chat2);
             finished = 1;
         }
-        print_to_chat(&messageHistory, recvbuff, chat2, row, chatWidth, chatHeight2, i, x);
+        print_to_chat(&messageHistory, recvbuff, chat2, row, chatWidth, chatHeight2, i, *x);
     }
     pthread_exit(NULL);
 }
@@ -401,22 +419,13 @@ void err_n_exit_win(const char *fmt, ...){
 }
 
 //Takes a message string and breaks it up into several strings to be put on different rows in messageHistory, then prints the history
-void print_to_chat(char*** p_messageHistory, char message[], WINDOW* chat2, int*row, int chatWidth, int chatHeight2, int message_bytes_len, int* x){
+void print_to_chat(char*** p_messageHistory, char message[], WINDOW* chat2, int*row, int chatWidth, int chatHeight2, int message_bytes_len, int x){
     char** messageHistory = *p_messageHistory;
     pthread_mutex_lock(&mutex);
-    bool has_username = false;
-    char* ptr = message;
-    while(*ptr){
-        if(*ptr == ':' && *(ptr+1) == ' '){
-            has_username = true;
-            break;
-        }
-        ptr++;
-    }
     
     int username_len = 0;
     unsigned int username_color_pair = 0;
-    if(has_username){
+    if(hasUsername(message)){
         while(message[username_len] != ':')
             username_len++;
         username_len += 2;
@@ -432,7 +441,8 @@ void print_to_chat(char*** p_messageHistory, char message[], WINDOW* chat2, int*
             //Print the messageHistory
             for(int j = 0; j < chatHeight2; j++){
                 username_color_pair = ((unsigned int)messageHistory[j][0]) % 6 + 1;
-                wattron(chat2, COLOR_PAIR(username_color_pair) | A_BOLD);
+                if(hasUsername(messageHistory[j]))
+                    wattron(chat2, COLOR_PAIR(username_color_pair) | A_BOLD);
                 if(j == 0)
                     wattroff(chat2, COLOR_PAIR(username_color_pair) | A_BOLD);
 
@@ -467,7 +477,8 @@ void print_to_chat(char*** p_messageHistory, char message[], WINDOW* chat2, int*
                     username_color_pair = ((unsigned int)messageHistory[k+1][0]) % 6 + 1;
                     strcpy(messageHistory[k], messageHistory[k+1]);
                     
-                    wattron(chat2, COLOR_PAIR(username_color_pair) | A_BOLD);
+                    if(hasUsername(messageHistory[k]))
+                        wattron(chat2, COLOR_PAIR(username_color_pair) | A_BOLD);
                     int x_pos = 0;
                     int index = 0;
                     for(x_pos; x_pos < u8strlen(messageHistory[k]); x_pos++){
@@ -496,7 +507,8 @@ void print_to_chat(char*** p_messageHistory, char message[], WINDOW* chat2, int*
             
             for(int k = *row-1 - messageRowLength; k <= *row-1; k++){
                 username_color_pair = ((unsigned int)messageHistory[k][0]) % 6 + 1;
-                wattron(chat2, COLOR_PAIR(username_color_pair) | A_BOLD);
+                if(hasUsername(messageHistory[k]))
+                    wattron(chat2, COLOR_PAIR(username_color_pair) | A_BOLD);
                     int x_pos = 0;
                     int index = 0;
                     for(x_pos; x_pos < u8strlen(messageHistory[k]); x_pos++){
@@ -517,7 +529,7 @@ void print_to_chat(char*** p_messageHistory, char message[], WINDOW* chat2, int*
             }
         }
         wrefresh(chat2);
-        wmove(input2, 0, *x);
+        wmove(input2, 0, x);
         wrefresh(input2);
         pthread_mutex_unlock(&mutex);
 }
@@ -543,8 +555,6 @@ int u8str_index(const char *s, int index){
     
     i++;
   }
-//   mvwprintw(input2, 5, 0, "index i:%d ", i);
-//   wrefresh(input2);
   return i;
 }
 
@@ -558,7 +568,15 @@ int u8str_index_first(const char *s, int index){
     
     i++;
   }
-//   mvwprintw(input2, 5, 0, "index i:%d ", i);
-//   wrefresh(input2);
   return i;
+}
+
+bool hasUsername(const char* message){
+    bool has_username = false;
+    while(*message){
+        if(*message == ':' && *(message+1) == ' ')
+            return true;
+        message++;
+    }
+    return false;
 }
