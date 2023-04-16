@@ -3,6 +3,7 @@
 #include <pthread.h>
 #include <locale.h>
 #include <ncurses.h>
+#include <ctype.h>
 
 //Struct type-definition
 typedef struct thread_params_t thread_params_t;
@@ -47,6 +48,7 @@ WINDOW *chat2;                                              //Inner chat window
 WINDOW *input2;                                             //Inner input window
 int finished;                                               //Bolean for terminating program
 char* username;                                             //Username
+char* ip_addr;
 
 int main(int argc, char **argv){
     //Declare data used by sockets
@@ -55,29 +57,166 @@ int main(int argc, char **argv){
     char sendbuff[MAXLINE];
     char recvbuff[MAXLINE];
 
-    //Check for proper usage of args
-    if (argc != 3){
-        err_n_die("usage: %s <server address> <username>", argv[0]);
-    }
-
     //Initialize ncurses
     setlocale(LC_CTYPE, "");    //Set locale for utf8
     initscr();                  //Initialize screen
     cbreak();                   //Allow exit with ctrl+c
     noecho();                   //don't print all user input
-    start_color();              //start colors
-
+    start_color();              //start 
+    
     //Init data used by ncurses
-    int yMax, xMax, borderTop, borderSide, chatHeight, chatWidth, chatHeight2, inputHeight, inputHeight2;
+    int yMax, xMax, borderTop, borderSide, logoHeight, logoWidth, logoPosX, chatHeight, chatWidth, chatHeight2, inputHeight, inputHeight2;
     borderTop = 1;
     borderSide = 2;
     getmaxyx(stdscr, yMax, xMax);
+
+    logoHeight = 7;
+    logoWidth = 24;
+    logoPosX = (int)((xMax-logoWidth)/2);
+
     chatHeight = (int)(yMax*0.75);
     chatWidth = xMax - 2*borderSide;
     chatHeight2 = chatHeight-2;
     inputHeight = yMax - chatHeight - borderTop*2;
     inputHeight2 = inputHeight - 2;
+    
 
+    keypad(input2, 1);
+    init_pair(1, COLOR_RED, COLOR_BLACK);
+    init_pair(2, COLOR_GREEN, COLOR_BLACK);
+    init_pair(3, COLOR_YELLOW, COLOR_BLACK);
+    init_pair(4, COLOR_BLUE, COLOR_BLACK);
+    init_pair(5, COLOR_MAGENTA, COLOR_BLACK);
+    init_pair(6, COLOR_CYAN, COLOR_BLACK);
+
+    //Check for proper usage of args
+    if (argc != 3){
+        ip_addr = calloc(16,sizeof(char));
+        username = calloc(30, sizeof(char));
+        //Display connection UI
+        //err_n_die("usage: %s <server address> <username>", argv[0]);
+        WINDOW *logo = newwin(logoHeight+2+2, logoWidth, 1, logoPosX);
+        WINDOW *info_input_border = newwin(3, logoWidth, logoHeight+2+2+1, logoPosX);
+        WINDOW *info_input = newwin(1, logoWidth-2, logoHeight+2+2+1+1, logoPosX+1);
+        WINDOW *text_win = newwin(1, logoWidth, logoHeight+2+2+1+1+3, logoPosX);
+        WINDOW *info_input2_border = newwin(3, logoWidth, logoHeight+2+2+1+1+4, logoPosX);
+        WINDOW *info_input2 = newwin(1, logoWidth-2, logoHeight+2+2+1+1+4+1, logoPosX+1);
+        curs_set(0);
+        wattron(logo, COLOR_PAIR(1) | A_BOLD);
+        mvwprintw(logo, 0, 0, " ________  ________     ");
+        wrefresh(logo);
+        usleep(200000);
+        mvwprintw(logo, 1, 0, "|\\   ____\\|\\   ____\\ ");
+        wrefresh(logo);
+        usleep(200000);
+        mvwprintw(logo, 2, 0, "\\ \\  \\___|\\ \\  \\___|    ");
+        wrefresh(logo);
+        usleep(200000);
+        mvwprintw(logo, 3, 0, " \\ \\  \\  __\\ \\  \\       ");
+        wrefresh(logo);
+        usleep(200000);
+        mvwprintw(logo, 4, 0, "  \\ \\  \\|\\  \\ \\  \\____  ");
+        wrefresh(logo);
+        usleep(200000);
+        mvwprintw(logo, 5, 0, "   \\ \\_______\\ \\_______\\");
+        wrefresh(logo);
+        usleep(200000);
+        mvwprintw(logo, 6, 0, "    \\|_______|\\|_______|");
+        wrefresh(logo);
+        usleep(200000);
+        mvwprintw(logo, 8, 0, " Welcome to GhoshCord!");
+        wrefresh(logo);
+        usleep(800000);
+        wattroff(logo, COLOR_PAIR(1) | A_BOLD);
+        mvwprintw(logo, 10, 0, "Please enter IP-address:");
+        wrefresh(logo);
+        usleep(200000);
+        box(info_input_border, 0, 0);
+        wrefresh(info_input_border);
+        
+        wmove(info_input, 0, 0);
+        curs_set(1);
+        wrefresh(info_input);
+        
+        //Query IP-addr from input field
+        bool got_ip_addr = false;
+        int i = 0;
+        while(!got_ip_addr){
+            int c = wgetch(info_input);
+            if(c == '\n')
+                got_ip_addr = true;
+
+            else if((isdigit(c) || c == '.') && i < 16){
+                ip_addr[i] = c;
+                mvwprintw(info_input, 0, i++, "%c", c);
+                wrefresh(info_input);
+            }
+            else if((c == 127 || c == KEY_BACKSPACE) && i > 0){
+                //backspace
+                ip_addr[--i] = '\0';
+                werase(info_input);
+                mvwprintw(info_input, 0, 0, "%s", ip_addr);
+                wmove(info_input, 0, i);
+                wrefresh(info_input);
+            }
+        }
+
+        mvwprintw(text_win, 0, 0, "Please enter a username:");
+        wrefresh(text_win);
+        usleep(200000);
+        box(info_input2_border, 0, 0);
+        wrefresh(info_input2_border);
+        wmove(info_input2, 0, 0);
+        wrefresh(info_input2);
+
+        //Query username from input field 2
+        bool got_username = false;
+        i = 0;
+        while(!got_username){
+            int c = wgetch(info_input2);
+            if(c == '\n')
+                got_username = true;
+            else if((c == 127 || c == KEY_BACKSPACE) && i > 0){
+                //backspace
+                char last_c = username[--i];
+                while(((last_c & 0XC0) == 0X80)){
+                    username[i] = '\0';
+                    last_c = username[--i];
+                }
+
+                username[i] = '\0';
+                werase(info_input2);
+                mvwprintw(info_input2, 0, 0, "%s", username);
+                wmove(info_input2, 0, u8strlen(username));
+                wrefresh(info_input2);
+            }
+            else if(c == KEY_UP || c == KEY_DOWN || c == KEY_RIGHT || c == KEY_LEFT){
+                //Do nothing for now
+            }
+            else if(i < logoWidth-2){
+                username[i++] = c;
+
+                if(((c & 0XC0) != 0XC0)){
+                    werase(info_input2);
+                    mvwprintw(info_input2, 0, 0, "%s", username);
+                    wrefresh(info_input2);
+                }
+            }
+            
+        }
+
+
+    } else {
+        //Obtain username and ip-address from command line args
+        //TODO check these
+        username = argv[2];
+        ip_addr = argv[1];
+    } 
+
+    
+
+    
+    //Init message data
     char** messageHistory = calloc(chatHeight2, sizeof(char*));
     for(int a = 0; a < chatHeight2; a++)
         messageHistory[a] = calloc(1024, sizeof(char));
@@ -95,21 +234,12 @@ int main(int argc, char **argv){
     refresh();
     wrefresh(chat);
     wrefresh(input);
-    keypad(input2, 1);
-    init_pair(1, COLOR_RED, COLOR_BLACK);
-    init_pair(2, COLOR_GREEN, COLOR_BLACK);
-    init_pair(3, COLOR_YELLOW, COLOR_BLACK);
-    init_pair(4, COLOR_BLUE, COLOR_BLACK);
-    init_pair(5, COLOR_MAGENTA, COLOR_BLACK);
-    init_pair(6, COLOR_CYAN, COLOR_BLACK);
+    
     attron(COLOR_PAIR(1) | A_BOLD);
-    mvprintw(0, xMax/2 - 8, "GhoshCord 1.0.1!");
+    mvprintw(0, xMax/2 - 8, "GhoshCord 1.1.0!");
     attroff(COLOR_PAIR(1) | A_BOLD);
     refresh();
 
-    
-        
-    username = argv[2];
 
     //Initialize socket
     if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
@@ -121,8 +251,8 @@ int main(int argc, char **argv){
     servaddr.sin_port = htons(SERVER_PORT);
 
     //Convert address from standard presentation from to binary form
-    if(inet_pton(AF_INET, argv[1], &servaddr.sin_addr) <= 0)
-        err_n_exit_win("inet_pton error.");
+    if(inet_pton(AF_INET, ip_addr, &servaddr.sin_addr) <= 0)
+        err_n_exit_win("inet_pton error. The supplied ip-address was probably malformed");
     
     //Connect to server address
     if(connect(sockfd, (SA *) &servaddr, sizeof(servaddr)) < 0)
@@ -216,6 +346,7 @@ int main(int argc, char **argv){
                     
                 break;
             case KEY_BACKSPACE:
+            case 127:
                 if(x == 0)
                     break;
                 int j = u8str_index(message, x)-1;
@@ -353,6 +484,10 @@ int main(int argc, char **argv){
     for(int a = 0; a < chatHeight2; a++)
         free(messageHistory[a]);
     free(messageHistory);
+    if(argc == 3){
+        free(username);
+        free(ip_addr);
+    }
     pthread_cancel(t);
     pthread_join(t, NULL);
     delwin(stdscr);

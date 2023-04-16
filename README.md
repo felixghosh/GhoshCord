@@ -18,4 +18,7 @@ GhoshCord is a multithreaded terminal user-interface chat application written in
 `./server`
 
 6. Clients connect using:  
+`./client`
+
+7. Alternatively one can connect directly from the commandline using:
 `./client <ip_address> <username>`
