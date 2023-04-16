@@ -1,5 +1,5 @@
-server
-client
+bin/server
+bin/client
 window
 window.c
 *.o

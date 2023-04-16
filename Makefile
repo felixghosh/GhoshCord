@@ -1,6 +1,6 @@
-sc: server.c client.c common.o
-	cc -g server.c -o server common.o -pthread
-	cc -g client.c -o client common.o -pthread -lncurses
+sc: src/server.c src/client.c common.o
+	cc -O3 src/server.c -o bin/server obj/common.o -pthread
+	cc -O3 src/client.c -o bin/client obj/common.o -pthread -lncurses
 
-common.o: common.c
-	cc -c common.c -o common.o
+common.o: src/common.c
+	cc -c src/common.c -o obj/common.o
