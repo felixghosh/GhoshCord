@@ -15,10 +15,10 @@ GhoshCord is a multithreaded terminal user-interface chat application written in
 `make`
 
 5. The server can be run using:  
-`./server`
+`bin/server`
 
 6. Clients connect using:  
-`./client`
+`bin/client`
 
 7. Alternatively one can connect directly from the commandline using:
-`./client <ip_address> <username>`
+`bin/client <ip_address> <username>`
